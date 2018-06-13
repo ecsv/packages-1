@@ -24,10 +24,10 @@ define KernelPackage/batman-adv
   URL:=https://www.open-mesh.org/
   MAINTAINER:=Simon Wunderlich <sw@simonwunderlich.de>
   SUBMENU:=Network Support
-  DEPENDS:=+KMOD_BATMAN_ADV_BLA:kmod-lib-crc16 +kmod-crypto-crc32c +kmod-lib-crc32c +kmod-cfg80211
+  DEPENDS:=+KMOD_BATMAN_ADV_BLA:kmod-lib-crc16 +kmod-crypto-crc32c +kmod-lib-crc32c
   TITLE:=B.A.T.M.A.N. Adv
-  FILES:=$(PKG_BUILD_DIR)/net/batman-adv/batman-adv.$(LINUX_KMOD_SUFFIX)
-  AUTOLOAD:=$(call AutoLoad,50,cfg80211 batman-adv)
+  FILES:=$(PKG_BUILD_DIR)/build/net/batman-adv/batman-adv.$(LINUX_KMOD_SUFFIX)
+  AUTOLOAD:=$(call AutoLoad,50,batman-adv)
 endef
 
 define KernelPackage/batman-adv/description
@@ -44,50 +44,30 @@ define Package/kmod-batman-adv/conffiles
 /etc/config/batman-adv
 endef
 
-PKG_EXTRA_KCONFIG:= \
-	CONFIG_BATMAN_ADV=m \
+MAKE_BATMAN_ADV_ARGS += \
+	CROSS_COMPILE="$(TARGET_CROSS)" \
+	KERNELPATH="$(LINUX_DIR)" \
+	ARCH="$(LINUX_KARCH)" \
+	PATH="$(TARGET_PATH)" \
+	SUBDIRS="$(PKG_BUILD_DIR)" \
+	PWD="$(PKG_BUILD_DIR)" \
+	LINUX_VERSION="$(LINUX_VERSION)" \
 	CONFIG_BATMAN_ADV_DEBUG=$(if $(CONFIG_KMOD_BATMAN_ADV_DEBUG_LOG),y,n) \
 	CONFIG_BATMAN_ADV_DEBUGFS=$(if $(CONFIG_KMOD_BATMAN_ADV_DEBUGFS),y,n) \
 	CONFIG_BATMAN_ADV_BLA=$(if $(CONFIG_KMOD_BATMAN_ADV_BLA),y,n) \
 	CONFIG_BATMAN_ADV_DAT=$(if $(CONFIG_KMOD_BATMAN_ADV_DAT),y,n) \
 	CONFIG_BATMAN_ADV_MCAST=$(if $(CONFIG_KMOD_BATMAN_ADV_MCAST),y,n) \
 	CONFIG_BATMAN_ADV_NC=$(if $(CONFIG_KMOD_BATMAN_ADV_NC),y,n) \
-	CONFIG_BATMAN_ADV_BATMAN_V=$(if $(CONFIG_KMOD_BATMAN_ADV_BATMAN_V),y,n) \
-
-PKG_EXTRA_CFLAGS:= \
-	$(patsubst CONFIG_%, -DCONFIG_%=1, $(patsubst %=m,%,$(filter %=m,$(PKG_EXTRA_KCONFIG)))) \
-	$(patsubst CONFIG_%, -DCONFIG_%=1, $(patsubst %=y,%,$(filter %=y,$(PKG_EXTRA_KCONFIG)))) \
-
-NOSTDINC_FLAGS = \
-	-I$(PKG_BUILD_DIR)/net/batman-adv \
-	-I$(STAGING_DIR)/usr/include/mac80211-backport \
-	-I$(STAGING_DIR)/usr/include/mac80211-backport/uapi \
-	-I$(STAGING_DIR)/usr/include/mac80211 \
-	-I$(STAGING_DIR)/usr/include/mac80211/uapi \
-	-I$(PKG_BUILD_DIR)/include/ \
-	-include backport/backport.h \
-	-include $(PKG_BUILD_DIR)/compat-hacks.h
-
-COMPAT_SOURCES = \
-	$(if $(CONFIG_KMOD_BATMAN_ADV_MCAST),../../compat-sources/net/core/skbuff.o,) \
-	$(if $(CONFIG_KMOD_BATMAN_ADV_MCAST),../../compat-sources/net/ipv4/igmp.o,) \
-	$(if $(CONFIG_KMOD_BATMAN_ADV_MCAST),../../compat-sources/net/ipv6/mcast_snoop.o,) \
+	REVISION="" all
 
 define Build/Compile
-	+env "batman-adv-y=$(COMPAT_SOURCES)" \
-	$(MAKE) $(PKG_JOBS) -C "$(LINUX_DIR)" \
-		ARCH="$(LINUX_KARCH)" \
-		CROSS_COMPILE="$(TARGET_CROSS)" \
-		SUBDIRS="$(PKG_BUILD_DIR)/net/batman-adv" \
-		$(PKG_EXTRA_KCONFIG) \
-		EXTRA_CFLAGS="$(PKG_EXTRA_CFLAGS)" \
-		NOSTDINC_FLAGS="$(NOSTDINC_FLAGS)" \
-		modules
+	$(MAKE) -C "$(PKG_BUILD_DIR)" $(MAKE_BATMAN_ADV_ARGS)
 endef
 
 define Build/Prepare
 	$(call Build/Prepare/Default)
-	$(CP) ./files/compat-hacks.h $(PKG_BUILD_DIR)/
+	$(SED) '/#define _NET_BATMAN_ADV_MAIN_H_/a\#undef CONFIG_MODULE_STRIPPED' \
+		$(PKG_BUILD_DIR)/net/batman-adv/main.h
 endef
 
 define Build/Clean

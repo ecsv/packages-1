@@ -28,8 +28,3 @@ config KMOD_BATMAN_ADV_NC
 	bool "enable network coding [requires promisc mode support]"
 	depends on PACKAGE_kmod-batman-adv
 	default n
-
-config KMOD_BATMAN_ADV_BATMAN_V
-	bool "enable batman v routing algorithm"
-	depends on PACKAGE_kmod-batman-adv
-	default y
